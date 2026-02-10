@@ -1,16 +1,48 @@
-# React + Vite
+# 貪食蛇遊戲 (Snake Game)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一個使用 React + Vite 打造的經典貪食蛇遊戲。
 
-Currently, two official plugins are available:
+## 遊戲介紹
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+貪食蛇是一款經典的益智遊戲，玩家控制一條不斷移動的蛇，透過吃掉食物來讓蛇身變長，同時必須避免撞到牆壁或自身。隨著蛇身越來越長，遊戲難度也會逐漸提升。
 
-## React Compiler
+## 遊戲玩法
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 使用方向鍵（↑ ↓ ← →）或 WASD 鍵控制蛇的移動方向
+- 吃掉畫面上出現的食物可以讓蛇身增長並獲得分數
+- 撞到牆壁或蛇身本身則遊戲結束
+- 挑戰最高分紀錄！
 
-## Expanding the ESLint configuration
+## 功能特色
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- 即時分數顯示
+- 最高分紀錄（儲存於本地端）
+- 開始 / 暫停 / 重新開始功能
+- 流暢的動畫效果
+
+## 技術架構
+
+- **框架**：React 19
+- **建置工具**：Vite 7
+- **語言**：JavaScript (JSX)
+- **樣式**：CSS
+
+## 開始使用
+
+### 安裝依賴
+
+```bash
+npm install
+```
+
+### 啟動開發伺服器
+
+```bash
+npm run dev
+```
+
+### 打包建置
+
+```bash
+npm run build
+```
