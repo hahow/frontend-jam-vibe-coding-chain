@@ -5,6 +5,15 @@ const GRID = 20
 const CELL = 24
 const SIZE = GRID * CELL
 
+// Food types with different shapes and score ranges
+const FOOD_TYPES = [
+  { type: 'apple', shape: 'circle', color: '#f87171', minScore: 8, maxScore: 12 },     // 紅蘋果
+  { type: 'cherry', shape: 'double', color: '#fb923c', minScore: 10, maxScore: 15 },   // 櫻桃
+  { type: 'grape', shape: 'cluster', color: '#a78bfa', minScore: 5, maxScore: 10 },    // 葡萄
+  { type: 'lemon', shape: 'oval', color: '#facc15', minScore: 7, maxScore: 13 },       // 檸檬
+  { type: 'berry', shape: 'star', color: '#f472b6', minScore: 9, maxScore: 14 },       // 莓果
+]
+
 // Difficulty settings: baseSpeed = initial interval, minSpeed = fastest possible
 const DIFFICULTIES = {
   easy: { label: '簡單', baseSpeed: 180, minSpeed: 100 },
@@ -72,7 +81,21 @@ function randFood(snake) {
   do {
     p = { x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * GRID) }
   } while (snake.some(s => s.x === p.x && s.y === p.y))
-  return p
+
+  // Randomly select a food type
+  const foodType = FOOD_TYPES[Math.floor(Math.random() * FOOD_TYPES.length)]
+
+  // Generate random score within the food type's range
+  const score = Math.floor(Math.random() * (foodType.maxScore - foodType.minScore + 1)) + foodType.minScore
+
+  return {
+    x: p.x,
+    y: p.y,
+    type: foodType.type,
+    shape: foodType.shape,
+    color: foodType.color,
+    score: score
+  }
 }
 
 function startState() {
@@ -119,7 +142,7 @@ function reducer(state, action) {
         ...state,
         snake: newSnake,
         food: ate ? randFood(newSnake) : food,
-        score: ate ? state.score + 10 : state.score,
+        score: ate ? state.score + food.score : state.score,
       }
     }
 
@@ -143,6 +166,73 @@ function drawBgAndGrid(ctx, theme) {
   }
 }
 
+function drawFood(ctx, food) {
+  const cx = food.x * CELL + CELL / 2
+  const cy = food.y * CELL + CELL / 2
+  const radius = CELL / 2 - 3
+
+  ctx.fillStyle = food.color
+
+  switch (food.shape) {
+    case 'circle': // Apple - simple circle
+      ctx.beginPath()
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2)
+      ctx.fill()
+      break
+
+    case 'double': // Cherry - two small circles
+      ctx.beginPath()
+      ctx.arc(cx - 4, cy + 2, radius * 0.6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(cx + 4, cy + 2, radius * 0.6, 0, Math.PI * 2)
+      ctx.fill()
+      break
+
+    case 'cluster': // Grape - cluster of small circles
+      const positions = [
+        { x: 0, y: -3 },
+        { x: -4, y: 2 },
+        { x: 4, y: 2 },
+        { x: 0, y: 5 }
+      ]
+      positions.forEach(pos => {
+        ctx.beginPath()
+        ctx.arc(cx + pos.x, cy + pos.y, radius * 0.5, 0, Math.PI * 2)
+        ctx.fill()
+      })
+      break
+
+    case 'oval': // Lemon - oval shape
+      ctx.save()
+      ctx.translate(cx, cy)
+      ctx.scale(1.2, 0.8)
+      ctx.beginPath()
+      ctx.arc(0, 0, radius, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+      break
+
+    case 'star': // Berry - star shape
+      ctx.beginPath()
+      for (let i = 0; i < 5; i++) {
+        const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2
+        const x = cx + Math.cos(angle) * radius
+        const y = cy + Math.sin(angle) * radius
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      }
+      ctx.closePath()
+      ctx.fill()
+      break
+
+    default:
+      ctx.beginPath()
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2)
+      ctx.fill()
+  }
+}
+
 function drawCanvas(ctx, state, snakeColor) {
   const { snake, food, dir } = state
   const theme = getTheme(state.score)
@@ -150,11 +240,8 @@ function drawCanvas(ctx, state, snakeColor) {
 
   drawBgAndGrid(ctx, theme)
 
-  // Food
-  ctx.fillStyle = theme.food
-  ctx.beginPath()
-  ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, CELL / 2 - 3, 0, Math.PI * 2)
-  ctx.fill()
+  // Food - draw with different shapes
+  drawFood(ctx, food)
 
   // Snake body - use custom color
   const [r, g, b] = customSnake.body
@@ -282,10 +369,7 @@ export default function App() {
         ctx.fillRect(0, 0, SIZE, SIZE)
       }
 
-      ctx.fillStyle = theme.food
-      ctx.beginPath()
-      ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, CELL / 2 - 3, 0, Math.PI * 2)
-      ctx.fill()
+      drawFood(ctx, food)
 
       const fadeAlpha = 1 - ease
       particles.forEach((p, i) => {
