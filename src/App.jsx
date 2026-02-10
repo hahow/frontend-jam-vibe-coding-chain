@@ -14,6 +14,13 @@ const FOOD_TYPES = [
   { type: 'berry', shape: 'star', color: '#f472b6', minScore: 9, maxScore: 14 },       // 莓果
 ]
 
+// Hazard types - dangerous items that reduce score
+const HAZARD_TYPES = [
+  { type: 'bomb', shape: 'skull', color: '#ef4444', minPenalty: 5, maxPenalty: 15 },      // 炸彈
+  { type: 'poison', shape: 'cross', color: '#8b5cf6', minPenalty: 8, maxPenalty: 12 },    // 毒藥
+  { type: 'spike', shape: 'triangle', color: '#f59e0b', minPenalty: 6, maxPenalty: 14 },  // 尖刺
+]
+
 // Difficulty settings: baseSpeed = initial interval, minSpeed = fastest possible
 const DIFFICULTIES = {
   easy: { label: '簡單', baseSpeed: 180, minSpeed: 100 },
@@ -76,11 +83,14 @@ function initSnake() {
   return [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }]
 }
 
-function randFood(snake) {
+function randFood(snake, hazard = null) {
   let p
   do {
     p = { x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * GRID) }
-  } while (snake.some(s => s.x === p.x && s.y === p.y))
+  } while (
+    snake.some(s => s.x === p.x && s.y === p.y) ||
+    (hazard && hazard.x === p.x && hazard.y === p.y)
+  )
 
   // Randomly select a food type
   const foodType = FOOD_TYPES[Math.floor(Math.random() * FOOD_TYPES.length)]
@@ -98,14 +108,43 @@ function randFood(snake) {
   }
 }
 
+function randHazard(snake, food) {
+  let p
+  do {
+    p = { x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * GRID) }
+  } while (
+    snake.some(s => s.x === p.x && s.y === p.y) ||
+    (food.x === p.x && food.y === p.y)
+  )
+
+  // Randomly select a hazard type
+  const hazardType = HAZARD_TYPES[Math.floor(Math.random() * HAZARD_TYPES.length)]
+
+  // Generate random penalty within the hazard type's range
+  const penalty = Math.floor(Math.random() * (hazardType.maxPenalty - hazardType.minPenalty + 1)) + hazardType.minPenalty
+
+  return {
+    x: p.x,
+    y: p.y,
+    type: hazardType.type,
+    shape: hazardType.shape,
+    color: hazardType.color,
+    penalty: penalty
+  }
+}
+
 function startState() {
   const snake = initSnake()
-  return { snake, food: randFood(snake), dir: { x: 1, y: 0 }, status: 'running', score: 0 }
+  const food = randFood(snake)
+  const hazard = randHazard(snake, food)
+  return { snake, food, hazard, dir: { x: 1, y: 0 }, status: 'running', score: 0 }
 }
 
 function makeIdle() {
   const snake = initSnake()
-  return { snake, food: randFood(snake), dir: { x: 1, y: 0 }, status: 'idle', score: 0 }
+  const food = randFood(snake)
+  const hazard = randHazard(snake, food)
+  return { snake, food, hazard, dir: { x: 1, y: 0 }, status: 'idle', score: 0 }
 }
 
 function reducer(state, action) {
@@ -125,7 +164,7 @@ function reducer(state, action) {
 
     case 'TICK': {
       if (state.status !== 'running') return state
-      const { snake, food, dir } = state
+      const { snake, food, hazard, dir } = state
       const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y }
 
       if (
@@ -136,13 +175,37 @@ function reducer(state, action) {
         return { ...state, status: 'dying' }
       }
 
-      const ate = head.x === food.x && head.y === food.y
-      const newSnake = ate ? [head, ...snake] : [head, ...snake.slice(0, -1)]
+      const ateFood = head.x === food.x && head.y === food.y
+      const ateHazard = head.x === hazard.x && head.y === hazard.y
+
+      let newSnake, newFood, newHazard, newScore
+
+      if (ateFood) {
+        // Ate food: grow snake, increase score, generate new food
+        newSnake = [head, ...snake]
+        newScore = state.score + food.score
+        newHazard = hazard
+        newFood = randFood(newSnake, newHazard)
+      } else if (ateHazard) {
+        // Ate hazard: don't grow, decrease score (min 0), generate new hazard
+        newSnake = [head, ...snake.slice(0, -1)]
+        newScore = Math.max(0, state.score - hazard.penalty)
+        newFood = food
+        newHazard = randHazard(newSnake, newFood)
+      } else {
+        // Normal move: no growth
+        newSnake = [head, ...snake.slice(0, -1)]
+        newScore = state.score
+        newFood = food
+        newHazard = hazard
+      }
+
       return {
         ...state,
         snake: newSnake,
-        food: ate ? randFood(newSnake) : food,
-        score: ate ? state.score + food.score : state.score,
+        food: newFood,
+        hazard: newHazard,
+        score: newScore,
       }
     }
 
@@ -233,8 +296,74 @@ function drawFood(ctx, food) {
   }
 }
 
+function drawHazard(ctx, hazard) {
+  const cx = hazard.x * CELL + CELL / 2
+  const cy = hazard.y * CELL + CELL / 2
+  const size = CELL / 2 - 2
+
+  ctx.fillStyle = hazard.color
+  ctx.strokeStyle = hazard.color
+  ctx.lineWidth = 2.5
+
+  switch (hazard.shape) {
+    case 'skull': // Skull shape
+      // Head circle
+      ctx.beginPath()
+      ctx.arc(cx, cy - 2, size * 0.7, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Eyes (using theme background would be better, but we'll use black)
+      ctx.fillStyle = '#1a1a1a'
+      ctx.beginPath()
+      ctx.arc(cx - 3, cy - 4, 2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(cx + 3, cy - 4, 2, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Jaw
+      ctx.fillStyle = hazard.color
+      ctx.fillRect(cx - 4, cy + 3, 8, 4)
+      break
+
+    case 'cross': // X mark (poison)
+      ctx.beginPath()
+      ctx.moveTo(cx - size, cy - size)
+      ctx.lineTo(cx + size, cy + size)
+      ctx.moveTo(cx + size, cy - size)
+      ctx.lineTo(cx - size, cy + size)
+      ctx.stroke()
+
+      // Add circle border
+      ctx.beginPath()
+      ctx.arc(cx, cy, size, 0, Math.PI * 2)
+      ctx.stroke()
+      break
+
+    case 'triangle': // Warning triangle with exclamation
+      // Triangle
+      ctx.beginPath()
+      ctx.moveTo(cx, cy - size)
+      ctx.lineTo(cx - size, cy + size)
+      ctx.lineTo(cx + size, cy + size)
+      ctx.closePath()
+      ctx.fill()
+
+      // Exclamation mark
+      ctx.fillStyle = '#1a1a1a'
+      ctx.fillRect(cx - 1.5, cy - 4, 3, 6)
+      ctx.fillRect(cx - 1.5, cy + 4, 3, 2)
+      break
+
+    default:
+      ctx.beginPath()
+      ctx.arc(cx, cy, size, 0, Math.PI * 2)
+      ctx.fill()
+  }
+}
+
 function drawCanvas(ctx, state, snakeColor) {
-  const { snake, food, dir } = state
+  const { snake, food, hazard, dir } = state
   const theme = getTheme(state.score)
   const customSnake = SNAKE_COLORS[snakeColor]
 
@@ -242,6 +371,11 @@ function drawCanvas(ctx, state, snakeColor) {
 
   // Food - draw with different shapes
   drawFood(ctx, food)
+
+  // Hazard - draw dangerous items
+  if (hazard) {
+    drawHazard(ctx, hazard)
+  }
 
   // Snake body - use custom color
   const [r, g, b] = customSnake.body
@@ -346,7 +480,7 @@ export default function App() {
 
     const startTime = performance.now()
     const duration = 800
-    const { snake, food } = state
+    const { snake, food, hazard } = state
     const theme = getTheme(state.score)
     const customSnake = SNAKE_COLORS[snakeColor]
     const [br, bg, bb] = customSnake.body
@@ -370,6 +504,9 @@ export default function App() {
       }
 
       drawFood(ctx, food)
+      if (hazard) {
+        drawHazard(ctx, hazard)
+      }
 
       const fadeAlpha = 1 - ease
       particles.forEach((p, i) => {
